@@ -1,32 +1,76 @@
-"""Utilities for splitting text into smaller, processable chunks."""
+"""
+Text preprocessing and chunking utilities.
+"""
 
-from __future__ import annotations
-
+import re
+import uuid
 from typing import List
 
+from app.models import DocumentChunk
 
-def split_text(text: str, chunk_size: int = 800, overlap: int = 100) -> List[str]:
-    """Split text into overlapping chunks.
+from app.config import CHUNK_SIZE, CHUNK_OVERLAP
 
-    The implementation is intentionally simple and dependency-free so it can be
-    used as a baseline for later integration with more advanced chunking logic.
+def clean_text(text: str) -> str:
     """
-    if not text:
-        return []
+    Clean extracted PDF text.
+    """
 
-    words = text.split()
-    if len(words) <= chunk_size:
-        return [text.strip()]
+    text = text.replace("\t", " ")
+
+    text = re.sub(r"\s+", " ", text)
+
+    return text.strip()
+
+
+def chunk_text(
+    text: str,
+    chunk_size: int = CHUNK_SIZE,
+    overlap: int = CHUNK_OVERLAP,
+) -> List[str]:
+    """
+    Split text into overlapping chunks.
+    """
 
     chunks: List[str] = []
+
     start = 0
-    while start < len(words):
-        end = min(start + chunk_size, len(words))
-        chunk = " ".join(words[start:end]).strip()
-        if chunk:
-            chunks.append(chunk)
-        if end == len(words):
-            break
-        start = max(0, end - overlap)
+
+    while start < len(text):
+        end = start + chunk_size
+
+        chunks.append(text[start:end])
+
+        start += chunk_size - overlap
 
     return chunks
+
+
+def build_document_chunks(
+    pages: List[str],
+    source: str,
+) -> List[DocumentChunk]:
+    """
+    Convert PDF pages into DocumentChunk objects.
+    """
+
+    document_chunks: List[DocumentChunk] = []
+
+    for page_number, page_text in enumerate(pages, start=1):
+
+        cleaned = clean_text(page_text)
+
+        page_chunks = chunk_text(cleaned)
+
+        for chunk_index, chunk in enumerate(page_chunks):
+
+            document_chunks.append(
+                DocumentChunk(
+                    chunk_id=str(uuid.uuid4()),
+                    text=chunk,
+                    source=source,
+                    page_number=page_number,
+                    chunk_index=chunk_index,
+                )
+            )
+
+    return document_chunks
