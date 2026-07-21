@@ -1,0 +1,25 @@
+# Virtual Environment
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+
+# Environment Variables
+.env
+
+# ChromaDB
+chroma_db/
+
+# Test cache
+.pytest_cache/
+.coverage
+
+# OS files
+.DS_Store
+Thumbs.db
