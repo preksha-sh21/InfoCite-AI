@@ -42,7 +42,6 @@ class VectorStore:
         """
         Delete the existing collection and recreate it.
         """
-
         try:
             self.client.delete_collection(
                 CHROMA_COLLECTION_NAME
@@ -96,3 +95,24 @@ class VectorStore:
         )
 
         print(f"Stored {len(chunks)} chunks in ChromaDB.")
+
+    def query(
+        self,
+        query_embedding: List[float],
+        top_k: int = 5,
+    ):
+        """
+        Retrieve the most similar document chunks.
+        """
+
+        results = self.collection.query(
+            query_embeddings=[query_embedding],
+            n_results=top_k,
+            include=[
+                "documents",
+                "metadatas",
+                "distances",
+            ],
+        )
+
+        return results
