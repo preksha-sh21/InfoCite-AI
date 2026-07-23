@@ -1,13 +1,10 @@
 """
 Simple script to verify the PDF loading and chunking pipeline.
-
-Run using:
-    python -m scripts.test_loader
 """
 
-from app.chunking import build_document_chunks
-from app.config import PDF_PATH
-from app.loader import load_pdf
+from core.config import PDF_PATH
+from services.chunking import build_document_chunks
+from services.loader import load_pdf
 
 
 def main() -> None:
