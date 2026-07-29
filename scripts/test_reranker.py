@@ -1,6 +1,7 @@
 from core.config import PDF_PATH
 
 from services.llm import LLMService
+from services.verifier import CitationVerifier
 from services.loader import load_pdf
 from services.chunking import build_document_chunks
 from services.embeddings import EmbeddingService
@@ -35,6 +36,7 @@ def main() -> None:
 
     reranker = CrossEncoderReranker()
     llm = LLMService()
+    verifier = CitationVerifier()
 
     while True:
 
@@ -65,15 +67,26 @@ def main() -> None:
             chunks=ranked_chunks,
         )
 
+        citations = verifier.format_citations(
+            ranked_chunks,
+        )
+        confidence = verifier.confidence(
+            ranked_chunks,
+        )
         print("=" * 80)
         print("ANSWER")
         print("=" * 80)
         print(answer)
 
+        print()
+        print(citations)
+        print()
+        print(f"Confidence: {confidence}")
+
         print("\n")
 
         print("=" * 80)
-        print("SOURCES")
+        print("DEBUG INFORMATION")
         print("=" * 80)
 
         for rank, chunk in enumerate(ranked_chunks, start=1):
