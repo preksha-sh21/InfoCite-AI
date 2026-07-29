@@ -1,5 +1,6 @@
 from core.config import PDF_PATH
 
+from services.llm import LLMService
 from services.loader import load_pdf
 from services.chunking import build_document_chunks
 from services.embeddings import EmbeddingService
@@ -33,6 +34,7 @@ def main() -> None:
     )
 
     reranker = CrossEncoderReranker()
+    llm = LLMService()
 
     while True:
 
@@ -56,17 +58,33 @@ def main() -> None:
         )
 
         print("=" * 80)
+        print("\nGenerating answer...\n")
+
+        answer = llm.generate_answer(
+            query=query,
+            chunks=ranked_chunks,
+        )
+
+        print("=" * 80)
+        print("ANSWER")
+        print("=" * 80)
+        print(answer)
+
+        print("\n")
+
+        print("=" * 80)
+        print("SOURCES")
+        print("=" * 80)
 
         for rank, chunk in enumerate(ranked_chunks, start=1):
 
-            print(f"Rank {rank}")
+            print(f"{rank}. Page {chunk['page']}")
             print(f"Cross Score : {chunk['cross_score']:.4f}")
             print(f"RRF Score   : {chunk['rrf_score']:.4f}")
-            print(f"Page        : {chunk['page']}")
 
             print()
 
-            print(chunk["text"][:500])
+            print(chunk["text"][:250])
 
             print()
 

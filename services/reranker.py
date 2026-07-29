@@ -1,3 +1,8 @@
+import os
+
+# Force CPU usage before importing torch/sentence-transformers
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
+
 from sentence_transformers import CrossEncoder
 
 from core.config import (
@@ -8,7 +13,7 @@ from core.config import (
 
 class CrossEncoderReranker:
     """
-    Re-ranks retrieved chunks using a CrossEncoder.
+    Re-ranks retrieved chunks using a CrossEncoder model.
     """
 
     def __init__(self) -> None:
@@ -16,7 +21,8 @@ class CrossEncoderReranker:
         print(f"Loading reranker: {RERANKER_MODEL}")
 
         self.model = CrossEncoder(
-            RERANKER_MODEL
+            model_name=RERANKER_MODEL,
+            device="cpu",
         )
 
         print("CrossEncoder loaded.")
@@ -27,27 +33,25 @@ class CrossEncoderReranker:
         retrieved_chunks: list[dict],
     ) -> list[dict]:
 
+        if not retrieved_chunks:
+            return []
+
         pairs = [
-            (
-                query,
-                chunk["text"],
-            )
+            (query, chunk["text"])
             for chunk in retrieved_chunks
         ]
 
         scores = self.model.predict(
-            pairs
+            pairs,
+            show_progress_bar=False,
         )
 
-        for chunk, score in zip(
-            retrieved_chunks,
-            scores,
-        ):
+        for chunk, score in zip(retrieved_chunks, scores):
             chunk["cross_score"] = float(score)
 
         ranked = sorted(
             retrieved_chunks,
-            key=lambda x: x["cross_score"],
+            key=lambda chunk: chunk["cross_score"],
             reverse=True,
         )
 

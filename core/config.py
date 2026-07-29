@@ -42,3 +42,9 @@ CHROMA_COLLECTION_NAME = "infocite_documents"
 RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
 RERANK_TOP_K = 5
+
+LLM_MODEL = "llama3.2:3b"
+
+MAX_CONTEXT_CHUNKS = 5
+
+TEMPERATURE = 0.2
