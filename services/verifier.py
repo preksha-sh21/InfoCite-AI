@@ -4,30 +4,39 @@ class CitationVerifier:
     """
 
     def extract_pages(self, chunks):
+        """
+        Extract source document names and page numbers from the
+        top-ranked chunks.
+        """
 
-        pages = {
-            chunk.get("page")
-            for chunk in chunks
-            if chunk.get("page") is not None
-        }
+        citations = []
 
-        return sorted(pages)
+        seen = set()
+
+        for chunk in chunks[:3]:
+
+            source = chunk.get("source", "Unknown Document")
+            page = chunk.get("page")
+
+            citation = f"{source} — Page {page}"
+
+            if citation not in seen:
+                citations.append(citation)
+                seen.add(citation)
+
+        return citations
 
     def format_citations(self, chunks):
+        citations = self.extract_pages(chunks)
 
-        pages = self.extract_pages(chunks)
-
-        if not pages:
+        if not citations:
             return "Sources: None"
 
-        lines = [f"• Page {page}" for page in pages]
+        lines = [f"• {citation}" for citation in citations]
 
         return "Sources:\n" + "\n".join(lines)
 
     def confidence(self, chunks):
-        """
-        Estimate confidence from the top CrossEncoder score.
-        """
 
         if not chunks:
             return "Low"
