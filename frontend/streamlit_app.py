@@ -1,9 +1,13 @@
 import html
+import os
 
 import requests
 import streamlit as st
 
-API_URL = "http://127.0.0.1:8000"
+API_URL = os.getenv(
+    "API_URL",
+    "http://127.0.0.1:8000",
+)
 
 st.set_page_config(
     page_title="InfoCite AI",
@@ -674,7 +678,7 @@ with st.sidebar:
                     )
                 except requests.exceptions.RequestException as exc:
                     st.error(
-                        "Unable to connect to the API backend. Please make sure the server is running on http://127.0.0.1:8000."
+                        f"Unable to connect to the API backend. Please make sure the server is running on {API_URL}."
                     )
                     st.write(f"Error: {exc}")
                     response = None
@@ -790,11 +794,11 @@ if ask_submitted:
                 response = requests.post(
                     f"{API_URL}/ask",
                     json={"question": question},
-                    timeout=15,
+                    timeout=120,
                 )
             except requests.exceptions.RequestException as exc:
                 st.error(
-                    "Unable to connect to the API backend. Please make sure the server is running on http://127.0.0.1:8000."
+                    f"Unable to connect to the API backend. Please make sure the server is running on {API_URL}."
                 )
                 st.write(f"Error: {exc}")
                 response = None

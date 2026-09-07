@@ -14,7 +14,7 @@ This project was built to explore how modern RAG systems work by combining seman
 - BM25 keyword-based retrieval
 - Hybrid retrieval combining semantic and keyword search
 - Cross-Encoder reranking for better retrieval quality
-- Local Llama 3.2 inference using Ollama
+- Configurable local Ollama or hosted LLM inference
 - Answers with page-level citations
 - FastAPI backend
 - Streamlit frontend with a custom neon-inspired interface
@@ -31,7 +31,7 @@ This project was built to explore how modern RAG systems work by combining seman
 - Sentence Transformers
 - Rank-BM25
 - CrossEncoder
-- Ollama
+- Ollama or an OpenAI-compatible hosted LLM API
 
 ### Frontend
 
@@ -44,7 +44,7 @@ This project was built to explore how modern RAG systems work by combining seman
 |----------|-------|
 | Embedding Model | all-MiniLM-L6-v2 |
 | Reranker | cross-encoder/ms-marco-MiniLM-L-6-v2 |
-| LLM | Llama 3.2 |
+| LLM | Llama 3.2 locally, or the configured hosted model |
 
 ---
 
@@ -74,7 +74,7 @@ Semantic Search   BM25 Search
  CrossEncoder Reranker
             │
             ▼
-     Llama 3.2 (Ollama)
+       Configured LLM provider
             │
             ▼
  Answer + Source Citations
@@ -135,6 +135,36 @@ InfoCite_AI
 ├── README.md
 └── .gitignore
 ```
+
+---
+
+## LLM Configuration
+
+Ollama remains the default provider for local development. Install and start
+Ollama, then make sure the local model is available:
+
+```powershell
+ollama pull llama3.2:3b
+$env:LLM_PROVIDER = "ollama"
+$env:LLM_MODEL = "llama3.2:3b"
+```
+
+For Render, select the hosted OpenAI-compatible provider. Set these environment
+variables in the Render service settings. Keep the API key in Render's secret
+environment variable storage; do not commit it to this repository.
+
+```text
+LLM_PROVIDER=hosted
+LLM_API_KEY=<your-hosted-provider-api-key>
+LLM_BASE_URL=<your-provider-openai-compatible-base-url>
+LLM_MODEL=<your-provider-model-name>
+```
+
+`LLM_BASE_URL` should be the provider's OpenAI-compatible API base, without the
+`/chat/completions` suffix. The application appends that path automatically.
+
+The hosted provider uses the existing `requests` dependency, so no additional
+package is required. The RAG retrieval and response pipeline is unchanged.
 
 ---
 

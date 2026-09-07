@@ -2,6 +2,7 @@
 Central configuration for InfoCite AI.
 """
 
+import os
 from pathlib import Path
 
 
@@ -43,7 +44,12 @@ RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
 RERANK_TOP_K = 5
 
-LLM_MODEL = "llama3.2:3b"
+# Ollama is the default for local development. A hosted OpenAI-compatible
+# provider can be selected for deployment through environment variables.
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama").lower()
+LLM_API_KEY = os.getenv("LLM_API_KEY", "")
+LLM_BASE_URL = os.getenv("LLM_BASE_URL", "")
+LLM_MODEL = os.getenv("LLM_MODEL", "llama3.2:3b")
 
 MAX_CONTEXT_CHUNKS = 5
 
