@@ -83,6 +83,7 @@ def upload_pdfs(
     return {
         "message": f"Successfully indexed {len(pdf_paths)} PDF(s).",
         "documents": [pdf.name for pdf in pdf_paths],
+        "index_stats": pipeline.index_stats,
     }
 
 

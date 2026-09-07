@@ -7,6 +7,10 @@ from services.hybrid_retriever import HybridRetriever
 from services.reranker import CrossEncoderReranker
 from services.llm import LLMService
 from services.verifier import CitationVerifier
+from core.config import (
+    EMBEDDING_MODEL,
+    LLM_MODEL,
+)
 
 
 class RAGPipeline:
@@ -30,6 +34,13 @@ class RAGPipeline:
         self.llm = LLMService()
 
         self.verifier = CitationVerifier()
+        self.index_stats = {
+            "documents": 0,
+            "chunks": 0,
+            "retriever": "Hybrid",
+            "embeddings": EMBEDDING_MODEL,
+            "llm": LLM_MODEL,
+        }
 
         print("InfoCite AI initialized successfully.")
 
@@ -62,6 +73,13 @@ class RAGPipeline:
             all_chunks.extend(chunks)
 
         print(f"Total chunks created: {len(all_chunks)}")
+        self.index_stats = {
+            "documents": len(pdf_paths),
+            "chunks": len(all_chunks),
+            "retriever": "Hybrid",
+            "embeddings": EMBEDDING_MODEL,
+            "llm": LLM_MODEL,
+        }
 
         # Generate embeddings
         texts = [

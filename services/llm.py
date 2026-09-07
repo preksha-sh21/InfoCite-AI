@@ -50,16 +50,23 @@ Answer the user's question ONLY using the provided context.
 Requirements:
 - Use ONLY the provided context.
 - Write the answer in your own words.
-- Be concise, clear, and technically accurate.
+- Give a clear and sufficiently detailed answer based on the available context.
+- Do not give an unnecessarily short one-sentence answer when the context contains more relevant information.
+- Explain the main points rather than simply naming or pointing to them.
 - Combine information from multiple context chunks when appropriate.
+- Include relevant details from the context that directly help answer the question.
+- For questions asking about a topic, provide a short explanatory paragraph.
+- For questions asking about multiple items, use a short bullet list when appropriate.
+- If the context contains several relevant details, include the important ones rather than mentioning only one.
 - Do NOT copy long passages from the document.
-- Do NOT invent or assume information that is not present.
+- Do NOT invent, assume, or infer unsupported information.
+- If only limited information is available, clearly state what can be determined from the context.
 - Do NOT include page numbers.
 - Do NOT include citations.
 - Do NOT include a "Sources" section.
 - Return ONLY the answer.
 - If the answer cannot be found in the provided context, reply exactly:
-  "I don't have enough information in the provided document."
+    "I don't have enough information in the provided documents."
 
 Context:
 {context}
