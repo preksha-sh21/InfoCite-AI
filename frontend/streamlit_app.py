@@ -258,7 +258,15 @@ with right_col:
                     "<div class='styled-card'><h2>Sources</h2></div>",
                     unsafe_allow_html=True,
                 )
-                for source in result["sources"]:
-                    st.markdown(f"<div class='source-item'>{source}</div>", unsafe_allow_html=True)
+                for item in result["evidence"]:
+                    source = item["source"]
+                    page = item["page"]
+                    text = item["text"]
+
+                    with st.expander(
+                        f"📄 {source} - Page {page}"
+                    ):
+                        st.markdown("**Retrieved evidence**")
+                        st.write(text)
             elif response is not None:
                 st.error(response.json().get("detail", "Unable to get an answer."))

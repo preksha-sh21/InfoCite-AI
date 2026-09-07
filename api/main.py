@@ -104,5 +104,6 @@ def ask(request: QuestionRequest):
     return QuestionResponse(
         answer=result["answer"],
         sources=result["sources"],
+        evidence=result["evidence"],
         confidence=result["confidence"],
     )

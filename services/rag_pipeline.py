@@ -45,10 +45,19 @@ class RAGPipeline:
 
             pages = load_pdf(pdf_path)
 
+            print(f"Pages extracted from {pdf_path.name}: {len(pages)}")
+
+            for page_number, page_text in enumerate(pages, start=1):
+                print(
+                    f"    Page {page_number}: {len(page_text.strip())} characters"
+                )
+
             chunks = build_document_chunks(
                 pages,
                 pdf_path.name,
             )
+
+            print(f"Chunks created from {pdf_path.name}: {len(chunks)}")
 
             all_chunks.extend(chunks)
 
@@ -120,9 +129,13 @@ class RAGPipeline:
             ranked_chunks,
         )
 
+        evidence = self.verifier.extract_evidence(
+          ranked_chunks,
+        )
+
         return {
             "answer": answer,
             "sources": citations,
+            "evidence": evidence,
             "confidence": confidence,
-            "chunks": ranked_chunks,
         }
