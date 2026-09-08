@@ -674,7 +674,7 @@ with st.sidebar:
                     response = requests.post(
                         f"{API_URL}/upload",
                         files=files,
-                        timeout=120,
+                        timeout=300,
                     )
                 except requests.exceptions.RequestException as exc:
                     st.error(
