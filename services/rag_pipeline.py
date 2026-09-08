@@ -81,24 +81,29 @@ class RAGPipeline:
             "llm": LLM_MODEL,
         }
 
-        # Generate embeddings
+        # Generate embeddings only while indexing, then release the model.
         texts = [
             chunk.text
             for chunk in all_chunks
         ]
 
-        embeddings = self.embedding_service.generate_embeddings(
-            texts
-        )
+        embeddings = None
+        try:
+            embeddings = self.embedding_service.generate_embeddings(
+                texts
+            )
 
-        # Reset vector database
-        self.vector_store.reset()
+            # Reset vector database
+            self.vector_store.reset()
 
-        # Store vectors
-        self.vector_store.add_documents(
-            all_chunks,
-            embeddings,
-        )
+            # Store vectors
+            self.vector_store.add_documents(
+                all_chunks,
+                embeddings,
+            )
+        finally:
+            embeddings = None
+            self.embedding_service.unload_model()
 
         # Build BM25 index
         self.bm25 = BM25Retriever(all_chunks)
@@ -121,15 +126,21 @@ class RAGPipeline:
                 "No documents have been indexed. Please upload and index PDFs first."
             )
 
-        retrieved_chunks = self.hybrid.retrieve(
-            query=question,
-            top_k=10,
-        )
+        try:
+            retrieved_chunks = self.hybrid.retrieve(
+                query=question,
+                top_k=10,
+            )
+        finally:
+            self.embedding_service.unload_model()
 
-        ranked_chunks = self.reranker.rerank(
-            query=question,
-            retrieved_chunks=retrieved_chunks,
-        )
+        try:
+            ranked_chunks = self.reranker.rerank(
+                query=question,
+                retrieved_chunks=retrieved_chunks,
+            )
+        finally:
+            self.reranker.unload_model()
 
         print("\nTop ranked chunk:")
         print(ranked_chunks[0])

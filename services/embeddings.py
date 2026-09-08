@@ -2,9 +2,10 @@
 Embedding generation service.
 """
 
+import gc
+import os
+import threading
 from typing import List
-
-from sentence_transformers import SentenceTransformer
 
 from core.config import EMBEDDING_MODEL
 
@@ -15,19 +16,38 @@ class EmbeddingService:
     """
 
     def __init__(self) -> None:
-        print(f"Loading embedding model: {EMBEDDING_MODEL}")
+        self.model = None
+        self._load_lock = threading.Lock()
 
-        self.model = SentenceTransformer(
-            EMBEDDING_MODEL,
-            device="cpu",
-        )
+    def _load_model(self) -> None:
+        if self.model is not None:
+            return
 
-        print("Embedding model loaded successfully.")
+        with self._load_lock:
+            if self.model is not None:
+                return
+
+            os.environ["CUDA_VISIBLE_DEVICES"] = ""
+            from sentence_transformers import SentenceTransformer
+
+            print(f"Loading embedding model: {EMBEDDING_MODEL}")
+            model = SentenceTransformer(EMBEDDING_MODEL, device="cpu")
+            self.model = model
+            print("Embedding model loaded successfully.")
+
+    def unload_model(self) -> None:
+        if self.model is None:
+            return
+
+        del self.model
+        self.model = None
+        gc.collect()
 
     def generate_embedding(self, text: str) -> List[float]:
         """
         Generate an embedding for a single piece of text.
         """
+        self._load_model()
         embedding = self.model.encode(
             text,
             convert_to_numpy=True,
@@ -44,9 +64,10 @@ class EmbeddingService:
         """
         Generate embeddings for multiple texts.
         """
+        self._load_model()
         embeddings = self.model.encode(
             texts,
-            batch_size=batch_size,
+            batch_size=min(batch_size, 8),
             convert_to_numpy=True,
             normalize_embeddings=True,
             show_progress_bar=True,

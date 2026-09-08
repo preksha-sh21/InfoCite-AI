@@ -1,9 +1,6 @@
+import gc
 import os
-
-# Force CPU usage before importing torch/sentence-transformers
-os.environ["CUDA_VISIBLE_DEVICES"] = ""
-
-from sentence_transformers import CrossEncoder
+import threading
 
 from core.config import (
     RERANKER_MODEL,
@@ -17,15 +14,35 @@ class CrossEncoderReranker:
     """
 
     def __init__(self) -> None:
+        self.model = None
+        self._load_lock = threading.Lock()
 
-        print(f"Loading reranker: {RERANKER_MODEL}")
+    def _load_model(self) -> None:
+        if self.model is not None:
+            return
 
-        self.model = CrossEncoder(
-            model_name=RERANKER_MODEL,
-            device="cpu",
-        )
+        with self._load_lock:
+            if self.model is not None:
+                return
 
-        print("CrossEncoder loaded.")
+            os.environ["CUDA_VISIBLE_DEVICES"] = ""
+            from sentence_transformers import CrossEncoder
+
+            print(f"Loading reranker: {RERANKER_MODEL}")
+            model = CrossEncoder(
+                model_name=RERANKER_MODEL,
+                device="cpu",
+            )
+            self.model = model
+            print("CrossEncoder loaded.")
+
+    def unload_model(self) -> None:
+        if self.model is None:
+            return
+
+        del self.model
+        self.model = None
+        gc.collect()
 
     def rerank(
         self,
@@ -35,6 +52,8 @@ class CrossEncoderReranker:
 
         if not retrieved_chunks:
             return []
+
+        self._load_model()
 
         pairs = [
             (query, chunk["text"])
