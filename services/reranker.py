@@ -1,48 +1,20 @@
-import gc
-import os
-import threading
+import re
 
 from core.config import (
-    RERANKER_MODEL,
     RERANK_TOP_K,
 )
 
 
 class CrossEncoderReranker:
     """
-    Re-ranks retrieved chunks using a CrossEncoder model.
+    Re-ranks retrieved chunks using deterministic lexical overlap.
     """
 
     def __init__(self) -> None:
         self.model = None
-        self._load_lock = threading.Lock()
-
-    def _load_model(self) -> None:
-        if self.model is not None:
-            return
-
-        with self._load_lock:
-            if self.model is not None:
-                return
-
-            os.environ["CUDA_VISIBLE_DEVICES"] = ""
-            from sentence_transformers import CrossEncoder
-
-            print(f"Loading reranker: {RERANKER_MODEL}")
-            model = CrossEncoder(
-                model_name=RERANKER_MODEL,
-                device="cpu",
-            )
-            self.model = model
-            print("CrossEncoder loaded.")
 
     def unload_model(self) -> None:
-        if self.model is None:
-            return
-
-        del self.model
         self.model = None
-        gc.collect()
 
     def rerank(
         self,
@@ -53,20 +25,16 @@ class CrossEncoderReranker:
         if not retrieved_chunks:
             return []
 
-        self._load_model()
+        query_terms = set(re.findall(r"\w+", query.lower()))
 
-        pairs = [
-            (query, chunk["text"])
-            for chunk in retrieved_chunks
-        ]
-
-        scores = self.model.predict(
-            pairs,
-            show_progress_bar=False,
-        )
-
-        for chunk, score in zip(retrieved_chunks, scores):
-            chunk["cross_score"] = float(score)
+        for chunk in retrieved_chunks:
+            chunk_terms = set(re.findall(r"\w+", chunk["text"].lower()))
+            matched_terms = query_terms.intersection(chunk_terms)
+            chunk["cross_score"] = (
+                10.0 * len(matched_terms) / len(query_terms)
+                if query_terms
+                else 0.0
+            )
 
         ranked = sorted(
             retrieved_chunks,

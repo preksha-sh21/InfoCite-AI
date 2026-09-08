@@ -97,7 +97,6 @@ rpds-py==0.27.1
 safetensors==0.7.0
 scikit-learn==1.6.1
 scipy==1.13.1
-sentence-transformers==5.1.2
 shellingham==1.5.4
 six==1.17.0
 smmap==5.0.3
@@ -111,12 +110,8 @@ threadpoolctl==3.6.0
 tokenizers==0.22.2
 toml==0.10.2
 tomli==2.4.1
-torch==2.7.1
-torchaudio==2.7.1
-torchvision==0.22.1
 tornado==6.5.7
 tqdm==4.67.3
-transformers==4.57.6
 typer==0.15.4
 typing-inspection==0.4.2
 typing_extensions==4.15.0
