@@ -1,5 +1,9 @@
 import html
+import io
 import os
+import re
+import uuid
+from urllib.parse import quote
 
 import requests
 import streamlit as st
@@ -613,6 +617,16 @@ st.markdown(
 if "indexed" not in st.session_state:
     st.session_state.indexed = False
 
+if "workspace_id" not in st.session_state:
+    st.session_state.workspace_id = uuid.uuid4().hex
+    st.session_state.indexed = False
+    st.session_state.documents = []
+    st.session_state.index_stats = {}
+    st.session_state.last_result = None
+    st.session_state.conversation = []
+
+API_HEADERS = {"X-Workspace-ID": st.session_state.workspace_id}
+
 if "documents" not in st.session_state:
     st.session_state.documents = []
 
@@ -621,6 +635,9 @@ if "index_stats" not in st.session_state:
 
 if "last_result" not in st.session_state:
     st.session_state.last_result = None
+
+if "conversation" not in st.session_state:
+    st.session_state.conversation = []
 
 # ----------------------------
 # Sidebar: documents and index status
@@ -638,7 +655,7 @@ with st.sidebar:
         </div>
         <div class="eyebrow">Knowledge workspace</div>
         <div class="sidebar-heading"><span>▤</span> Documents</div>
-        <p class="sidebar-copy">Add up to three PDF files, then index them to begin your research.</p>
+        <p class="sidebar-copy">Create a private workspace with your PDFs, then ask questions backed by page evidence.</p>
         """,
         unsafe_allow_html=True,
     )
@@ -647,15 +664,23 @@ with st.sidebar:
         "Upload PDF documents",
         type=["pdf"],
         accept_multiple_files=True,
-        help="Upload up to 3 PDFs to index and query. Maximum 200 MB per file.",
+        help="Upload up to 10 PDFs to your workspace. Maximum 200 MB per file.",
         label_visibility="collapsed",
+    )
+
+    upload_mode = st.radio(
+        "When indexing",
+        ["Add to workspace", "Replace all documents"],
+        horizontal=True,
+        label_visibility="collapsed",
+        key="upload_mode",
     )
 
     if st.button("Index documents", use_container_width=True):
         if not uploaded_files:
             st.warning("Please upload at least one PDF.")
-        elif len(uploaded_files) > 3:
-            st.error("Maximum of 3 PDFs allowed.")
+        elif len(uploaded_files) > 10:
+            st.error("Maximum of 10 PDFs allowed per indexing request.")
         else:
             with st.spinner("Indexing documents..."):
                 files = [
@@ -669,11 +694,14 @@ with st.sidebar:
                     )
                     for file in uploaded_files
                 ]
+                mode = "add" if upload_mode == "Add to workspace" else "replace"
 
                 try:
                     response = requests.post(
                         f"{API_URL}/upload",
                         files=files,
+                        data={"mode": mode},
+                        headers=API_HEADERS,
                         timeout=300,
                     )
                 except requests.exceptions.RequestException as exc:
@@ -689,29 +717,62 @@ with st.sidebar:
                 st.session_state.documents = data["documents"]
                 st.session_state.index_stats = data["index_stats"]
                 st.session_state.last_result = None
+                st.session_state.conversation = []
                 st.success(data["message"])
             elif response is not None:
                 st.error(response.json().get("detail", "Indexing failed."))
 
     if st.session_state.documents:
-        document_rows = "".join(
-            f"""
-            <div class="document-row">
-                <span class="document-icon">▧</span>
-                <span class="document-name" title="{html.escape(str(document))}">{html.escape(str(document))}</span>
-            </div>
-            """
-            for document in st.session_state.documents
-        )
         st.markdown(
-            f"""
+            """
             <div style="margin-top: 1.3rem;">
                 <div class="section-heading"><h2>Indexed documents</h2></div>
-                <div class="document-list">{document_rows}</div>
             </div>
             """,
             unsafe_allow_html=True,
         )
+
+        for document in list(st.session_state.documents):
+            remove_col, name_col = st.columns([1, 4])
+            if remove_col.button("×", key=f"remove_{st.session_state.workspace_id}_{document}", help=f"Remove {document}"):
+                try:
+                    response = requests.delete(
+                        f"{API_URL}/documents/{quote(str(document), safe='')}",
+                        headers=API_HEADERS,
+                        timeout=300,
+                    )
+                    if response.ok:
+                        data = response.json()
+                        st.session_state.documents = data["documents"]
+                        st.session_state.index_stats = data["index_stats"]
+                        st.session_state.indexed = bool(data["documents"])
+                        st.session_state.last_result = None
+                        st.session_state.conversation = []
+                        st.rerun()
+                    else:
+                        st.error(response.json().get("detail", "Unable to remove document."))
+                except requests.exceptions.RequestException as exc:
+                    st.error(f"Unable to connect to the API backend: {exc}")
+            name_col.caption(document)
+
+        if st.button("Clear all documents", use_container_width=True):
+            try:
+                response = requests.delete(
+                    f"{API_URL}/documents",
+                    headers=API_HEADERS,
+                    timeout=60,
+                )
+                if response.ok:
+                    st.session_state.documents = []
+                    st.session_state.index_stats = response.json()["index_stats"]
+                    st.session_state.indexed = False
+                    st.session_state.last_result = None
+                    st.session_state.conversation = []
+                    st.rerun()
+                else:
+                    st.error(response.json().get("detail", "Unable to clear documents."))
+            except requests.exceptions.RequestException as exc:
+                st.error(f"Unable to connect to the API backend: {exc}")
 
     if st.session_state.index_stats:
         stats = st.session_state.index_stats
@@ -720,6 +781,7 @@ with st.sidebar:
             ("Chunks", stats.get("chunks", "—")),
             ("Retriever", stats.get("retriever", "—")),
             ("Embeddings", stats.get("embeddings", "—")),
+            ("Reranker", stats.get("reranker", "—")),
             ("LLM", stats.get("llm", "—")),
         ]
         rows_html = "".join(
@@ -793,7 +855,17 @@ if ask_submitted:
             try:
                 response = requests.post(
                     f"{API_URL}/ask",
-                    json={"question": question},
+                    json={
+                        "question": question,
+                        "history": [
+                            {
+                                "question": turn["question"][:1000],
+                                "answer": turn["answer"][:3000],
+                            }
+                            for turn in st.session_state.conversation[-3:]
+                        ],
+                    },
+                    headers=API_HEADERS,
                     timeout=120,
                 )
             except requests.exceptions.RequestException as exc:
@@ -805,6 +877,9 @@ if ask_submitted:
 
         if response is not None and response.status_code == 200:
             st.session_state.last_result = response.json()
+            st.session_state.conversation.append(
+                {"question": question.strip(), "answer": response.json()["answer"]}
+            )
         elif response is not None:
             st.error(response.json().get("detail", "Unable to get an answer."))
 
@@ -812,6 +887,11 @@ result = st.session_state.last_result
 
 if result:
     answer = html.escape(str(result.get("answer", "")))
+    answer = re.sub(
+        r"\[(\d+)\]",
+        r'<a href="#citation-\1">[\1]</a>',
+        answer,
+    )
     evidence = result.get("evidence", [])
     sources = result.get("sources", [])
     source_count = len(sources) if sources else len(evidence)
@@ -842,14 +922,42 @@ if result:
         source = str(item.get("source", "Unknown document"))
         page = item.get("page")
         text = str(item.get("text", ""))
+        citation_id = item.get("citation_id")
         page_label = f"Page {page}" if page is not None else "Page unavailable"
 
-        with st.expander(f"▧  {source}  —  {page_label}"):
+        st.markdown(
+            f'<span id="citation-{int(citation_id)}"></span>',
+            unsafe_allow_html=True,
+        )
+        with st.expander(f"[{citation_id}]  ▧  {source}  —  {page_label}"):
             st.markdown(
                 '<span class="evidence-label">Retrieved evidence</span>',
                 unsafe_allow_html=True,
             )
             st.write(text)
+            if page is not None:
+                try:
+                    preview_response = requests.get(
+                        f"{API_URL}/documents/{quote(source, safe='')}/pages/{page}/preview",
+                        headers=API_HEADERS,
+                        timeout=30,
+                    )
+                    if preview_response.ok:
+                        st.image(
+                            io.BytesIO(preview_response.content),
+                            caption=f"{source} · page {page}",
+                            use_container_width=True,
+                        )
+                    else:
+                        st.caption("Page preview is unavailable.")
+                except requests.exceptions.RequestException:
+                    st.caption("Could not load the page preview.")
+
+    if len(st.session_state.conversation) > 1:
+        with st.expander("Conversation history"):
+            for turn in st.session_state.conversation[:-1]:
+                st.markdown(f"**You asked:** {turn['question']}")
+                st.write(turn["answer"])
 else:
     state_title = "Your answer will appear here"
     state_copy = (

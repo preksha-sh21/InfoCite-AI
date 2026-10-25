@@ -2,7 +2,8 @@
 Vector database service using ChromaDB.
 """
 
-from typing import List
+from pathlib import Path
+from typing import List, Union
 
 import chromadb
 from chromadb.api.models.Collection import Collection
@@ -19,14 +20,19 @@ class VectorStore:
     Handles all interactions with ChromaDB.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        collection_name: str = CHROMA_COLLECTION_NAME,
+        db_path: Union[str, Path] = CHROMA_DB_DIR,
+    ) -> None:
+        self.collection_name = collection_name
         self.client = chromadb.PersistentClient(
-            path=str(CHROMA_DB_DIR)
+            path=str(db_path)
         )
 
         self.collection: Collection = (
             self.client.get_or_create_collection(
-                name=CHROMA_COLLECTION_NAME
+                name=self.collection_name
             )
         )
 
@@ -44,7 +50,7 @@ class VectorStore:
         """
         try:
             self.client.delete_collection(
-                CHROMA_COLLECTION_NAME
+                self.collection_name
             )
             print("Existing collection deleted.")
 
@@ -53,11 +59,15 @@ class VectorStore:
 
         self.collection = (
             self.client.get_or_create_collection(
-                name=CHROMA_COLLECTION_NAME
+            name=self.collection_name
             )
         )
 
         print("Fresh collection created.")
+
+    def delete_collection(self) -> None:
+        """Remove this workspace's persisted vector collection."""
+        self.client.delete_collection(self.collection_name)
 
     def add_documents(
         self,

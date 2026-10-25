@@ -2,20 +2,25 @@
 
 InfoCite AI is a Retrieval-Augmented Generation (RAG) application that allows users to upload multiple PDF documents and ask questions in natural language. Instead of relying only on the language model, the system first retrieves relevant information from the uploaded documents and then generates answers with supporting citations.
 
-This project explores retrieval-augmented generation by combining semantic search, BM25 keyword search, reciprocal-rank fusion, lightweight lexical reranking, and local or hosted LLM inference.
+InfoCite AI is a document research workspace. It combines semantic search, BM25 keyword search, reciprocal-rank fusion, an ONNX cross-encoder, and local or hosted LLM inference to answer questions with page-level evidence.
 
 ---
 
 ## Features
 
-- Upload up to 3 PDF documents
+- Upload up to 10 PDFs per workspace; add, replace, or remove documents
+- Session-isolated document indexes, purged after 24 hours of inactivity
 - Automatic PDF parsing and text chunking
+- Best-effort extraction of bordered PDF tables into retrieval-friendly text
+- Optional OCR for scanned PDFs (requires Tesseract)
 - Semantic search using sentence embeddings
 - BM25 keyword-based retrieval
 - Hybrid retrieval combining semantic and keyword search
-- Lightweight lexical reranking based on query term coverage
+- Cross-encoder reranking with a quantized ONNX model
 - Configurable local Ollama or hosted LLM inference
-- Answers with page-level citations
+- Inline citation markers and page previews from the source PDF
+- Follow-up questions with short conversation history
+- Retrieval evaluation against a small labeled question set
 - FastAPI backend
 - Streamlit frontend with a custom neon-inspired interface
 
@@ -42,7 +47,7 @@ This project explores retrieval-augmented generation by combining semantic searc
 | Component| Model |
 |----------|-------|
 | Embedding Model | sentence-transformers/all-MiniLM-L6-v2 (ONNX inference) |
-| Reranker | Query term coverage (lexical heuristic; not a neural cross-encoder) |
+| Reranker | cross-encoder/ms-marco-MiniLM-L6-v2 (quantized ONNX) |
 | LLM | Llama 3.2 locally, or the configured hosted model |
 
 ---
@@ -70,7 +75,7 @@ Semantic Search   BM25 Search
      Hybrid Retrieval
             │
             ▼
- Lexical Reranker
+ Cross-Encoder Reranker (ONNX)
             │
             ▼
        Configured LLM provider
@@ -88,7 +93,7 @@ Semantic Search   BM25 Search
 2. Click **Index Documents**.
 3. Wait for indexing to complete.
 4. Ask a question related to the uploaded documents.
-5. The application retrieves the most relevant information and generates an answer with citations.
+5. The application retrieves and reranks relevant passages, then answers with numbered citations and page evidence.
 
 ## Run Locally
 
@@ -110,6 +115,24 @@ streamlit run frontend/streamlit_app.py
 ```
 
 The first indexing request downloads the embedding model from Hugging Face. For hosted inference, set `LLM_PROVIDER`, `LLM_API_KEY`, `LLM_BASE_URL`, and `LLM_MODEL` as described below.
+
+The first question also downloads the reranker model. To OCR image-only pages, install Tesseract with English language data and set `PDF_OCR_ENABLED=true`. `PDF_OCR_LANGUAGE` and `PDF_OCR_DPI` configure the OCR language and resolution.
+
+Table extraction is enabled by default through PyMuPDF and can be disabled with `PDF_TABLE_EXTRACTION_ENABLED=false`. Detection depends on how tables are drawn in the PDF; borderless or image-only tables may need OCR or manual processing.
+
+## Evaluate Retrieval
+
+Run the labeled CUDA guide benchmark:
+
+```powershell
+python scripts/evaluate_retrieval.py
+```
+
+The script compares hybrid retrieval with hybrid retrieval plus cross-encoder reranking. It reports Hit Rate@5, MRR@5, page Recall@5, and average retrieval/reranking time. The benchmark is small and intended for regression checks, not a claim of general RAG quality. It uses `data/raw/cuda_programming_guide.pdf` and a temporary Chroma collection that is removed after the run.
+
+## Workspace Isolation
+
+Each browser session receives a random workspace ID, and the API stores its PDFs and vectors separately. The ID is scoped to that browser session; the app does not currently provide account login or cross-device workspace recovery. Workspaces with no activity for 24 hours are purged the next time the API processes a request.
 
 ---
 
@@ -160,25 +183,26 @@ LLM_MODEL=<your-provider-model-name>
 `/chat/completions` suffix. The application appends that path automatically.
 
 The hosted provider uses the existing `requests` dependency, so no additional
-package is required. The RAG retrieval and response pipeline is unchanged.
+package is required. Local Ollama and hosted inference use the same retrieval
+and citation pipeline.
 
 ---
 
 ## Current Limitations
 
-- The lexical reranker and `evidence_match` label are heuristics, not a trained relevance model or calibrated answer-confidence estimate.
-- PDF text extraction does not currently perform OCR, so image-only scans may produce no usable text.
-- The upload limit is three PDFs and indexes are held by the running API process.
+- `evidence_match` remains a query-word overlap heuristic, not calibrated answer confidence.
+- OCR is optional and requires Tesseract to be installed on the API host.
+- Table extraction is best-effort; PyMuPDF's detector may miss tables without clear borders or table structure.
+- Workspace isolation is anonymous session isolation, not user authentication; the API is intended for a controlled demo until authentication and rate limits are added.
+- The current in-memory BM25 index is rebuilt from saved PDFs after an API restart. Run a single API instance for now.
 
 ## Roadmap
 
-- Add a labeled retrieval benchmark and report Recall@K / MRR.
-- Replace the lexical heuristic with an evaluated neural reranker.
-- Add OCR for scanned PDFs.
-- Support larger document collections
-- Docker deployment
-- Metadata-based filtering
-- Conversation history
+- Tune the abstention threshold using a larger answerable and unanswerable evaluation set.
+- Add authenticated accounts and durable workspace recovery.
+- Add background indexing jobs and progress reporting for large PDFs.
+- Improve table extraction and add more document formats.
+- Add deployment monitoring and rate limits.
 
 ---
 

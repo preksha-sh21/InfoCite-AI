@@ -8,7 +8,7 @@ from services.embeddings import EmbeddingService
 from services.vector_store import VectorStore
 from services.bm25 import BM25Retriever
 from services.hybrid_retriever import HybridRetriever
-from services.reranker import LexicalReranker
+from services.reranker import CrossEncoderReranker
 
 
 def main() -> None:
@@ -34,7 +34,7 @@ def main() -> None:
         embedding_service,
     )
 
-    reranker = LexicalReranker()
+    reranker = CrossEncoderReranker()
     llm = LLMService()
     verifier = CitationVerifier()
 
@@ -92,7 +92,8 @@ def main() -> None:
         for rank, chunk in enumerate(ranked_chunks, start=1):
 
             print(f"{rank}. Page {chunk['page']}")
-            print(f"Lexical Score : {chunk['lexical_score']:.4f}")
+            print(f"Cross-Encoder Score : {chunk['reranker_score']:.4f}")
+            print(f"Query Overlap       : {chunk['lexical_score']:.4f}")
             print(f"RRF Score   : {chunk['rrf_score']:.4f}")
 
             print()

@@ -75,11 +75,13 @@ class LLMService:
 
         for chunk in chunks[:MAX_CONTEXT_CHUNKS]:
             page = chunk.get("page", "Unknown")
+            source = chunk.get("source", "Unknown document")
+            citation_id = chunk.get("citation_id", "?")
             text = chunk.get("text", "")
 
             context_parts.append(
                 f"""
-Page {page}
+[{citation_id}] Source: {source}, page {page}
 {'-' * 60}
 {text}
 """
@@ -87,10 +89,15 @@ Page {page}
 
         return "\n".join(context_parts)
 
-    def _generate_prompt(self, query, context):
+    def _generate_prompt(self, query, context, history=None):
         """
         Build the prompt sent to the LLM.
         """
+
+        history_text = "\n".join(
+            f"User: {turn.get('question', '')}\nAssistant: {turn.get('answer', '')[:1000]}"
+            for turn in (history or [])[-3:]
+        ) or "No previous messages."
 
         return f"""
 You are InfoCite AI, an expert technical assistant.
@@ -111,14 +118,19 @@ Requirements:
 - Do NOT copy long passages from the document.
 - Do NOT invent, assume, or infer unsupported information.
 - If only limited information is available, clearly state what can be determined from the context.
+- Use conversation history only to understand references in a follow-up question; it is not evidence.
 - Do NOT include page numbers.
-- Do NOT include citations.
-- Do NOT include a "Sources" section.
+- Cite factual claims with the matching bracketed source number from the context, such as [1].
+- Do not invent citation numbers or cite a passage that does not support the claim.
+- Do NOT include a separate "Sources" section.
 - Return ONLY the answer.
 - If the answer cannot be found in the provided context, reply exactly:
     "I don't have enough information in the provided documents."
 
-Context:
+Conversation history (reference context only):
+{history_text}
+
+Document evidence:
 {context}
 
 Question:
@@ -127,7 +139,7 @@ Question:
 Answer:
 """
 
-    def generate_answer(self, query, chunks):
+    def generate_answer(self, query, chunks, history=None):
         """
         Generate an answer using the retrieved context.
         """
@@ -137,6 +149,7 @@ Answer:
         prompt = self._generate_prompt(
             query=query,
             context=context,
+            history=history,
         )
 
         if LLM_PROVIDER == "hosted":

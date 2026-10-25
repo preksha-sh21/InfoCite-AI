@@ -1,0 +1,44 @@
+[
+  {
+    "question": "How are CUDA threads organized into blocks and grids when a kernel launches?",
+    "expected_pages": [21]
+  },
+  {
+    "question": "What does SIMT mean for the way threads execute within a warp?",
+    "expected_pages": [23]
+  },
+  {
+    "question": "Why are CUDA thread block sizes often chosen as multiples of 32?",
+    "expected_pages": [25]
+  },
+  {
+    "question": "How does Unified Memory handle data placement between CPUs and GPUs?",
+    "expected_pages": [29, 30]
+  },
+  {
+    "question": "What is page-locked host memory, and why use it for CPU GPU transfers?",
+    "expected_pages": [138]
+  },
+  {
+    "question": "What are CUDA Graphs used for when repeating asynchronous operations?",
+    "expected_pages": [118, 130]
+  },
+  {
+    "question": "What is the relationship between NVCC, PTX, and executable GPU code?",
+    "expected_pages": [32]
+  },
+  {
+    "question": "What is global memory coalescing and why does it matter for CUDA performance?",
+    "expected_pages": [25, 74]
+  },
+  {
+    "question": "What is the capital of France?",
+    "expected_pages": [],
+    "answerable": false
+  },
+  {
+    "question": "What is the boiling point of water at sea level?",
+    "expected_pages": [],
+    "answerable": false
+  }
+]

@@ -4,12 +4,16 @@ from services.embeddings import EmbeddingService
 from services.vector_store import VectorStore
 from services.bm25 import BM25Retriever
 from services.hybrid_retriever import HybridRetriever
-from services.reranker import LexicalReranker
+from services.reranker import CrossEncoderReranker
 from services.llm import LLMService
 from services.verifier import CitationVerifier
+from typing import Optional
 from core.config import (
+    CHROMA_COLLECTION_NAME,
     EMBEDDING_MODEL,
     LLM_MODEL,
+    NO_ANSWER_RERANKER_THRESHOLD,
+    RERANKER_MODEL,
 )
 
 
@@ -18,18 +22,18 @@ class RAGPipeline:
     End-to-end Retrieval-Augmented Generation pipeline.
     """
 
-    def __init__(self):
+    def __init__(self, collection_name: str = CHROMA_COLLECTION_NAME):
 
         print("Initializing InfoCite AI...")
 
         self.embedding_service = EmbeddingService()
 
-        self.vector_store = VectorStore()
+        self.vector_store = VectorStore(collection_name=collection_name)
 
         self.bm25 = None
         self.hybrid = None
 
-        self.reranker = LexicalReranker()
+        self.reranker = CrossEncoderReranker()
 
         self.llm = LLMService()
 
@@ -39,6 +43,7 @@ class RAGPipeline:
             "chunks": 0,
             "retriever": "Hybrid",
             "embeddings": EMBEDDING_MODEL,
+            "reranker": RERANKER_MODEL,
             "llm": LLM_MODEL,
         }
 
@@ -86,6 +91,7 @@ class RAGPipeline:
             "chunks": len(all_chunks),
             "retriever": "Hybrid",
             "embeddings": EMBEDDING_MODEL,
+            "reranker": RERANKER_MODEL,
             "llm": LLM_MODEL,
         }
 
@@ -127,7 +133,33 @@ class RAGPipeline:
             f"Successfully indexed {len(pdf_paths)} document(s)."
         )
 
-    def ask(self, question: str):
+    def restore_documents(self, pdf_paths):
+        """Rebuild the in-memory keyword index from a workspace's saved PDFs."""
+        chunks = []
+        for pdf_path in pdf_paths:
+            pages = load_pdf(pdf_path)
+            chunks.extend(build_document_chunks(pages, pdf_path.name))
+
+        if not chunks or self.vector_store.count() == 0:
+            self.index_documents(pdf_paths)
+            return
+
+        self.bm25 = BM25Retriever(chunks)
+        self.hybrid = HybridRetriever(
+            self.vector_store,
+            self.bm25,
+            self.embedding_service,
+        )
+        self.index_stats = {
+            "documents": len(pdf_paths),
+            "chunks": len(chunks),
+            "retriever": "Hybrid",
+            "embeddings": EMBEDDING_MODEL,
+            "reranker": RERANKER_MODEL,
+            "llm": LLM_MODEL,
+        }
+
+    def ask(self, question: str, history: Optional[list[dict]] = None):
 
         if not question or not question.strip():
             raise ValueError("Please enter a question.")
@@ -137,20 +169,34 @@ class RAGPipeline:
                 "No documents have been indexed. Please upload and index PDFs first."
             )
 
+        recent_history = (history or [])[-3:]
+        retrieval_query = question
+        if recent_history:
+            history_text = "\n".join(
+                f"Q: {turn.get('question', '')} A: {turn.get('answer', '')[:400]}"
+                for turn in recent_history
+            )
+            retrieval_query = f"Current question: {question}\nRecent context: {history_text}"
+
         try:
             retrieved_chunks = self.hybrid.retrieve(
-                query=question,
+                query=retrieval_query,
                 top_k=10,
             )
         finally:
             self.embedding_service.unload_model()
 
         ranked_chunks = self.reranker.rerank(
-            query=question,
+            query=retrieval_query,
             retrieved_chunks=retrieved_chunks,
+            evidence_query=question,
         )
 
-        if not ranked_chunks or ranked_chunks[0].get("lexical_score", 0) < 0.2:
+        if (
+            not ranked_chunks
+            or ranked_chunks[0].get("reranker_score", float("-inf"))
+            < NO_ANSWER_RERANKER_THRESHOLD
+        ):
             return {
                 "answer": "I don't have enough information in the provided documents.",
                 "sources": [],
@@ -158,9 +204,12 @@ class RAGPipeline:
                 "evidence_match": "Low",
             }
 
+        self.verifier.assign_citation_ids(ranked_chunks)
+
         answer = self.llm.generate_answer(
             query=question,
             chunks=ranked_chunks,
+            history=recent_history,
         )
 
         citations = self.verifier.extract_pages(

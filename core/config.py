@@ -39,8 +39,11 @@ TOP_K = 5
 
 CHROMA_COLLECTION_NAME = "infocite_documents"
 
-
 RERANK_TOP_K = 5
+RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L6-v2"
+RERANKER_REVISION = "eeed17e3bfc6fa06a790f2d12a9501fec587fccf"
+RERANKER_ONNX_FILE = "onnx/model_qint8_avx2.onnx"
+NO_ANSWER_RERANKER_THRESHOLD = 0.0
 
 # Ollama is the default for local development. A hosted OpenAI-compatible
 # provider can be selected for deployment through environment variables.
@@ -52,3 +55,8 @@ LLM_MODEL = os.getenv("LLM_MODEL", "llama3.2:3b")
 MAX_CONTEXT_CHUNKS = 5
 
 TEMPERATURE = 0.2
+
+PDF_OCR_ENABLED = os.getenv("PDF_OCR_ENABLED", "false").lower() in {"1", "true", "yes"}
+PDF_OCR_LANGUAGE = os.getenv("PDF_OCR_LANGUAGE", "eng")
+PDF_OCR_DPI = int(os.getenv("PDF_OCR_DPI", "200"))
+PDF_TABLE_EXTRACTION_ENABLED = os.getenv("PDF_TABLE_EXTRACTION_ENABLED", "true").lower() in {"1", "true", "yes"}

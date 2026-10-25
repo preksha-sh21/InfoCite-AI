@@ -14,18 +14,29 @@ class CitationVerifier:
 
         seen = set()
 
-        for chunk in chunks[:3]:
+        for chunk in chunks[:5]:
 
             source = chunk.get("source", "Unknown Document")
             page = chunk.get("page")
 
-            citation = f"{source} — Page {page}"
+            citation_id = chunk.get("citation_id", len(citations) + 1)
+            citation = f"[{citation_id}] {source} — Page {page}"
 
             if citation not in seen:
                 citations.append(citation)
                 seen.add(citation)
 
         return citations
+
+    def assign_citation_ids(self, chunks):
+        """Assign stable citation numbers to each unique document page."""
+        citation_ids = {}
+        for chunk in chunks:
+            key = (chunk.get("source"), chunk.get("page"))
+            if key not in citation_ids:
+                citation_ids[key] = len(citation_ids) + 1
+            chunk["citation_id"] = citation_ids[key]
+        return chunks
 
     def extract_evidence(self, chunks):
         """
@@ -36,7 +47,7 @@ class CitationVerifier:
 
         seen = set()
 
-        for chunk in chunks[:3]:
+        for chunk in chunks[:5]:
 
             source = chunk.get("source", "Unknown Document")
             page = chunk.get("page")
@@ -54,6 +65,7 @@ class CitationVerifier:
                 "source": source,
                 "page": page,
                 "text": text,
+                "citation_id": chunk.get("citation_id"),
             })
 
             seen.add(citation)
