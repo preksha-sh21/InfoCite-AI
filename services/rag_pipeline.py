@@ -4,7 +4,7 @@ from services.embeddings import EmbeddingService
 from services.vector_store import VectorStore
 from services.bm25 import BM25Retriever
 from services.hybrid_retriever import HybridRetriever
-from services.reranker import CrossEncoderReranker
+from services.reranker import LexicalReranker
 from services.llm import LLMService
 from services.verifier import CitationVerifier
 from core.config import (
@@ -29,7 +29,7 @@ class RAGPipeline:
         self.bm25 = None
         self.hybrid = None
 
-        self.reranker = CrossEncoderReranker()
+        self.reranker = LexicalReranker()
 
         self.llm = LLMService()
 
@@ -68,11 +68,19 @@ class RAGPipeline:
                 pdf_path.name,
             )
 
+            if not chunks:
+                raise ValueError(
+                    f"No extractable text found in {pdf_path.name}. "
+                    "Scanned PDFs need OCR before they can be indexed."
+                )
+
             print(f"Chunks created from {pdf_path.name}: {len(chunks)}")
 
             all_chunks.extend(chunks)
 
         print(f"Total chunks created: {len(all_chunks)}")
+        if not all_chunks:
+            raise ValueError("No extractable text found in the uploaded PDFs.")
         self.index_stats = {
             "documents": len(pdf_paths),
             "chunks": len(all_chunks),
@@ -121,6 +129,9 @@ class RAGPipeline:
 
     def ask(self, question: str):
 
+        if not question or not question.strip():
+            raise ValueError("Please enter a question.")
+
         if self.hybrid is None:
             raise ValueError(
                 "No documents have been indexed. Please upload and index PDFs first."
@@ -134,16 +145,18 @@ class RAGPipeline:
         finally:
             self.embedding_service.unload_model()
 
-        try:
-            ranked_chunks = self.reranker.rerank(
-                query=question,
-                retrieved_chunks=retrieved_chunks,
-            )
-        finally:
-            self.reranker.unload_model()
+        ranked_chunks = self.reranker.rerank(
+            query=question,
+            retrieved_chunks=retrieved_chunks,
+        )
 
-        print("\nTop ranked chunk:")
-        print(ranked_chunks[0])
+        if not ranked_chunks or ranked_chunks[0].get("lexical_score", 0) < 0.2:
+            return {
+                "answer": "I don't have enough information in the provided documents.",
+                "sources": [],
+                "evidence": [],
+                "evidence_match": "Low",
+            }
 
         answer = self.llm.generate_answer(
             query=question,
@@ -154,7 +167,7 @@ class RAGPipeline:
             ranked_chunks,
         )
 
-        confidence = self.verifier.confidence(
+        evidence_match = self.verifier.evidence_match(
             ranked_chunks,
         )
 
@@ -166,5 +179,5 @@ class RAGPipeline:
             "answer": answer,
             "sources": citations,
             "evidence": evidence,
-            "confidence": confidence,
+            "evidence_match": evidence_match,
         }

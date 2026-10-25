@@ -22,7 +22,7 @@ def main():
         for page in result["sources"]:
             print(f"• Page {page}")
 
-        print(f"\nConfidence: {result['confidence']}")
+        print(f"\nEvidence match (heuristic): {result['evidence_match']}")
 
 
 if __name__ == "__main__":

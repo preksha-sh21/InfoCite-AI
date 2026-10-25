@@ -832,6 +832,12 @@ if result:
         unsafe_allow_html=True,
     )
 
+    evidence_match = result.get("evidence_match")
+    if evidence_match:
+        st.caption(
+            f"Evidence overlap: {evidence_match} · heuristic based on query terms, not calibrated confidence"
+        )
+
     for item in evidence:
         source = str(item.get("source", "Unknown document"))
         page = item.get("page")

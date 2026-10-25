@@ -8,7 +8,7 @@ from services.embeddings import EmbeddingService
 from services.vector_store import VectorStore
 from services.bm25 import BM25Retriever
 from services.hybrid_retriever import HybridRetriever
-from services.reranker import CrossEncoderReranker
+from services.reranker import LexicalReranker
 
 
 def main() -> None:
@@ -34,7 +34,7 @@ def main() -> None:
         embedding_service,
     )
 
-    reranker = CrossEncoderReranker()
+    reranker = LexicalReranker()
     llm = LLMService()
     verifier = CitationVerifier()
 
@@ -70,7 +70,7 @@ def main() -> None:
         citations = verifier.format_citations(
             ranked_chunks,
         )
-        confidence = verifier.confidence(
+        evidence_match = verifier.evidence_match(
             ranked_chunks,
         )
         print("=" * 80)
@@ -81,7 +81,7 @@ def main() -> None:
         print()
         print(citations)
         print()
-        print(f"Confidence: {confidence}")
+        print(f"Evidence match (heuristic): {evidence_match}")
 
         print("\n")
 
@@ -92,7 +92,7 @@ def main() -> None:
         for rank, chunk in enumerate(ranked_chunks, start=1):
 
             print(f"{rank}. Page {chunk['page']}")
-            print(f"Cross Score : {chunk['cross_score']:.4f}")
+            print(f"Lexical Score : {chunk['lexical_score']:.4f}")
             print(f"RRF Score   : {chunk['rrf_score']:.4f}")
 
             print()

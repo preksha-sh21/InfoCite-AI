@@ -18,4 +18,4 @@ class QuestionResponse(BaseModel):
     answer: str
     sources: list[str]
     evidence: list[Evidence]
-    confidence: str
+    evidence_match: str

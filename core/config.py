@@ -40,8 +40,6 @@ TOP_K = 5
 CHROMA_COLLECTION_NAME = "infocite_documents"
 
 
-RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
-
 RERANK_TOP_K = 5
 
 # Ollama is the default for local development. A hosted OpenAI-compatible

@@ -1,5 +1,6 @@
 from pathlib import Path
 import shutil
+import tempfile
 
 from fastapi import (
     FastAPI,
@@ -56,29 +57,50 @@ def upload_pdfs(
         )
 
     pdf_paths = []
+    safe_names = set()
 
-    # Remove previously uploaded PDFs
-    for pdf in UPLOAD_DIR.glob("*.pdf"):
-        pdf.unlink()
+    # Stage and validate all inputs before replacing the active document set.
+    with tempfile.TemporaryDirectory(dir=UPLOAD_DIR) as staging_dir:
+        for file in files:
+            original_name = Path(file.filename or "").name
+            if not original_name.lower().endswith(".pdf"):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"{original_name or 'Uploaded file'} is not a PDF.",
+                )
+            if not original_name:
+                raise HTTPException(status_code=400, detail="A filename is required.")
+            if original_name in safe_names:
+                raise HTTPException(status_code=400, detail=f"Duplicate filename: {original_name}")
+            safe_names.add(original_name)
 
-    # Save uploaded PDFs
-    for file in files:
+            destination = Path(staging_dir) / original_name
+            with destination.open("wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+            if destination.stat().st_size == 0 or destination.read_bytes()[:5] != b"%PDF-":
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"{original_name} is empty or is not a valid PDF file.",
+                )
+            pdf_paths.append(destination)
 
-        if not file.filename.lower().endswith(".pdf"):
+        try:
+            pipeline.index_documents(pdf_paths)
+        except Exception as exc:
             raise HTTPException(
-                status_code=400,
-                detail=f"{file.filename} is not a PDF."
+                status_code=422,
+                detail=f"Unable to index documents: {exc}",
             )
 
-        destination = UPLOAD_DIR / file.filename
-
-        with destination.open("wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
-        pdf_paths.append(destination)
-
-    # Index uploaded PDFs
-    pipeline.index_documents(pdf_paths)
+        # Publish staged files only after the new index has been built.
+        for pdf in UPLOAD_DIR.glob("*.pdf"):
+            pdf.unlink()
+        final_paths = []
+        for pdf in pdf_paths:
+            final_path = UPLOAD_DIR / pdf.name
+            shutil.copy2(pdf, final_path)
+            final_paths.append(final_path)
+        pdf_paths = final_paths
 
     return {
         "message": f"Successfully indexed {len(pdf_paths)} PDF(s).",
@@ -106,5 +128,5 @@ def ask(request: QuestionRequest):
         answer=result["answer"],
         sources=result["sources"],
         evidence=result["evidence"],
-        confidence=result["confidence"],
+        evidence_match=result["evidence_match"],
     )

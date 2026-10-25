@@ -5,15 +5,16 @@ from core.config import (
 )
 
 
-class CrossEncoderReranker:
+class LexicalReranker:
     """
-    Re-ranks retrieved chunks using deterministic lexical overlap.
+    Reranks retrieved chunks using query term coverage.
+
+    This lightweight lexical scorer is not a neural cross-encoder. It is kept
+    dependency-free and exposes its score as a retrieval signal, not calibrated
+    answer confidence.
     """
 
     def __init__(self) -> None:
-        self.model = None
-
-    def unload_model(self) -> None:
         self.model = None
 
     def rerank(
@@ -30,15 +31,15 @@ class CrossEncoderReranker:
         for chunk in retrieved_chunks:
             chunk_terms = set(re.findall(r"\w+", chunk["text"].lower()))
             matched_terms = query_terms.intersection(chunk_terms)
-            chunk["cross_score"] = (
-                10.0 * len(matched_terms) / len(query_terms)
+            chunk["lexical_score"] = (
+                len(matched_terms) / len(query_terms)
                 if query_terms
                 else 0.0
             )
 
         ranked = sorted(
             retrieved_chunks,
-            key=lambda chunk: chunk["cross_score"],
+            key=lambda chunk: chunk["lexical_score"],
             reverse=True,
         )
 

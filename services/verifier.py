@@ -1,7 +1,7 @@
 class CitationVerifier:
     """
     Handles citation extraction, evidence extraction,
-    and confidence estimation.
+    and heuristic evidence-match labeling.
     """
 
     def extract_pages(self, chunks):
@@ -70,17 +70,18 @@ class CitationVerifier:
 
         return "Sources:\n" + "\n".join(lines)
 
-    def confidence(self, chunks):
+    def evidence_match(self, chunks):
+        """Return a rough evidence-match label, not answer confidence."""
 
         if not chunks:
             return "Low"
 
-        score = chunks[0]["cross_score"]
+        score = chunks[0].get("lexical_score", 0.0)
 
-        if score >= 9:
+        if score >= 0.7:
             return "High"
 
-        if score >= 6:
+        if score >= 0.4:
             return "Medium"
 
         return "Low"
